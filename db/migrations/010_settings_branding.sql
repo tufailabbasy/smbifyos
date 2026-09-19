@@ -1,0 +1,1 @@
+ALTER TABLE app_settings ADD COLUMN agency_logo_url TEXT NOT NULL DEFAULT '';

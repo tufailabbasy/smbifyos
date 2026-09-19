@@ -1,0 +1,11 @@
+/.env
+node_modules
+/server/data/*
+/server/output/*
+/server/checkpoints/*
+.launcher-check.err.log
+.launcher-check.out.log
+.local-dev.log
+.npm-install.err.log
+.npm-install.out.log
+.merge-backup-*

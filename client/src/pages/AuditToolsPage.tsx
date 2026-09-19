@@ -1,0 +1,25 @@
+import { Link } from "react-router-dom";
+import { Card } from "../components/ui/Card";
+import { PageHeader } from "../components/ui/PageHeader";
+import { IconArrowRight, IconBriefcase, IconCheckCircle, IconGlobe, IconMail, IconMapPin } from "../components/ui/Icons";
+
+const tools = [
+  { name: "Website audit", eyebrow: "Technical + content", description: "Crawl a website and turn verified technical, on-page, content, trust and conversion findings into a client-ready audit.", to: "/audit-tools/website", icon: <IconGlobe size={21} />, tone: "bg-indigo-50 text-indigo-600 ring-indigo-100", features: ["Indexability, metadata and crawl signals", "Local service page and conversion checks", "Evidence-linked priorities and recommendations"] },
+  { name: "Local & GBP audit", eyebrow: "Local visibility", description: "Review the evidence available for a business profile and local search presence without filling missing data with estimates.", to: "/audit-tools/gmb", icon: <IconMapPin size={21} />, tone: "bg-emerald-50 text-emerald-600 ring-emerald-100", features: ["Profile completeness and location signals", "NAP and review evidence status", "Local opportunity summary for outreach"] },
+  { name: "SEO client workspace", eyebrow: "Delivery", description: "Move won opportunities into retained client work with businesses, tasks, checklists and monthly delivery tracking.", to: "/seo/dashboard", icon: <IconBriefcase size={21} />, tone: "bg-sky-50 text-sky-600 ring-sky-100", features: ["Client and business workspaces", "Repeatable checklist templates", "Tasks, owners and progress visibility"] },
+  { name: "Campaign workspace", eyebrow: "Outreach", description: "Build outreach around real audit findings, manage follow-up sequences, senders and delivery controls.", to: "/email/campaigns", icon: <IconMail size={21} />, tone: "bg-violet-50 text-violet-600 ring-violet-100", features: ["Finding-based personalization", "Sequenced follow-ups and suppression", "Sending remains gated by configuration"] },
+];
+
+export function AuditToolsPage() {
+  return <section className="page-enter space-y-6">
+    <PageHeader title="Audit Hub" description="Choose the right workflow for a prospect, then carry verified findings into outreach or client delivery." breadcrumbs={[{ label: "Workspace", href: "/dashboard" }, { label: "Audit Hub" }]} />
+
+    <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 px-6 py-7 text-white shadow-[0_18px_45px_rgba(15,23,42,.16)] sm:px-8">
+      <div className="absolute right-0 top-0 h-56 w-56 translate-x-1/3 -translate-y-1/3 rounded-full bg-indigo-500/25 blur-3xl" />
+      <div className="relative max-w-3xl"><p className="text-[10px] font-semibold uppercase tracking-[.17em] text-indigo-300">Evidence first</p><h2 className="mt-2 text-xl font-semibold tracking-tight sm:text-2xl">Audit what you can prove. Flag what still needs verification.</h2><p className="mt-2 text-sm leading-6 text-slate-400">Each audit separates observed evidence from unavailable checks, then converts confirmed gaps into useful priorities and outreach context.</p></div>
+      <div className="relative mt-6 grid gap-3 sm:grid-cols-3">{[["Website","Technical and on-page"],["Local","Profile and presence"],["Handoff","Pitch or client work"]].map(([title, text], index) => <div key={title} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[.055] p-3.5"><span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-[10px] font-bold text-indigo-200">0{index + 1}</span><div><p className="text-xs font-semibold text-white">{title}</p><p className="mt-0.5 text-[10px] text-slate-400">{text}</p></div></div>)}</div>
+    </div>
+
+    <div className="grid gap-4 lg:grid-cols-2">{tools.map((tool) => <Link key={tool.name} to={tool.to} className="group block"><Card className="h-full p-5 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-[0_16px_40px_rgba(15,23,42,.08)] sm:p-6"><div className="flex items-start gap-4"><div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ring-1 ${tool.tone}`}>{tool.icon}</div><div className="min-w-0 flex-1"><p className="text-[10px] font-semibold uppercase tracking-[.12em] text-slate-400">{tool.eyebrow}</p><div className="mt-1 flex items-center justify-between gap-3"><h3 className="text-base font-semibold text-slate-950">{tool.name}</h3><IconArrowRight size={17} className="shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-indigo-600" /></div><p className="mt-2 text-xs leading-5 text-slate-500">{tool.description}</p></div></div><ul className="mt-5 grid gap-2 border-t border-slate-100 pt-4 sm:grid-cols-3">{tool.features.map((feature) => <li key={feature} className="flex items-start gap-2 text-[11px] leading-4 text-slate-600"><IconCheckCircle size={14} className="mt-px shrink-0 text-emerald-500" />{feature}</li>)}</ul></Card></Link>)}</div>
+  </section>;
+}

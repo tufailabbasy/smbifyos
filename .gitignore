@@ -1,0 +1,46 @@
+node_modules/
+dist/
+.env
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+client/dist/
+db/scraper-output/*.json
+db/scraper-output/*.log
+
+scratch/remediation-*/
+scratch/deep-audit-*/
+.bootstrap-admin-password
+*.tsbuildinfo
+
+
+db/.bootstrap*
+db/.bootstrap-admin-credentials.json
+
+# Local-only and generated work
+.git-corrupt-backup-*/
+scratch/
+**/.venv/
+db/backups/
+db/scraper-output/
+GMB Automation/businesses/
+*.tmp
+/restored_*.tsx
+/d
+/automation_test*.cjs
+/automation_test.js
+/test_automation.cjs
+
+.render-bootstrap-credentials.json
+
+# Archived projects not required by SMBify OS runtime
+legacy-modules/bulk-article-generator/
+legacy-modules/email-sender/
+legacy-modules/yellow-page-scrapper/
+legacy-modules/yellow-page-scrapper-2/
+GMB Automation/*.docx
+GMB Automation/*.xlsx
+
+
+.github/workflows/

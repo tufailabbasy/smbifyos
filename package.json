@@ -1,0 +1,50 @@
+{
+  "name": "smbify-os",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npm run dev:stable",
+    "dev:stable": "concurrently --names API,UI --prefix-colors cyan,magenta --restart-tries 9999 --restart-after 3000 \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "node server/dev-server-supervisor.cjs",
+    "dev:server:raw": "tsx watch server/index.ts",
+    "dev:client": "npm --prefix client run dev",
+    "build": "npm run build:server && npm --prefix client run build",
+    "build:server": "tsc -p tsconfig.server.json && node scripts/copy-runtime-assets.cjs",
+    "start": "node dist/server/index.js",
+    "migrate": "tsx server/db/migrate.ts",
+    "typecheck": "tsc -p tsconfig.server.json --noEmit && npm --prefix client run typecheck",
+    "test": "tsx --test server/modules/outreach/personalizationCounters.test.ts server/modules/audits/evidenceIntegrity.test.ts server/modules/email/dispatchQueue.test.ts server/modules/automation/commandParser.test.ts",
+    "test:counters": "tsx --test server/modules/outreach/personalizationCounters.test.ts",
+    "test:audit-integrity": "tsx --test server/modules/audits/evidenceIntegrity.test.ts server/modules/email/dispatchQueue.test.ts server/modules/automation/commandParser.test.ts"
+  },
+  "dependencies": {
+    "cheerio": "^1.2.0",
+    "cors": "^2.8.5",
+    "csv-parse": "^5.6.0",
+    "docx": "^9.6.1",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "googleapis": "^171.4.0",
+    "multer": "^2.0.0",
+    "node-cron": "^4.0.0",
+    "nodemailer": "^9.0.5",
+    "playwright": "^1.59.0",
+    "undici": "^7.24.7",
+    "uuid": "^11.1.0",
+    "ws": "^8.20.0",
+    "xlsx": "^0.18.5",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.1",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^22.13.9",
+    "@types/nodemailer": "^7.0.11",
+    "@types/ws": "^8.18.1",
+    "concurrently": "^9.1.2",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}

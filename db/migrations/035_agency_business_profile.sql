@@ -1,0 +1,8 @@
+ALTER TABLE app_settings ADD COLUMN agency_website TEXT NOT NULL DEFAULT '';
+ALTER TABLE app_settings ADD COLUMN country TEXT NOT NULL DEFAULT '';
+ALTER TABLE app_settings ADD COLUMN postal_code TEXT NOT NULL DEFAULT '';
+ALTER TABLE app_settings ADD COLUMN tax_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE app_settings ADD COLUMN default_currency TEXT NOT NULL DEFAULT 'USD';
+ALTER TABLE app_settings ADD COLUMN invoice_prefix TEXT NOT NULL DEFAULT 'INV';
+ALTER TABLE app_settings ADD COLUMN payment_terms_days INTEGER NOT NULL DEFAULT 15;
+ALTER TABLE app_settings ADD COLUMN invoice_footer TEXT NOT NULL DEFAULT '';
