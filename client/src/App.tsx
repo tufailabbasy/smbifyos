@@ -28,10 +28,18 @@ import { EmailCampaignsPage } from "./pages/EmailCampaignsPage";
 import { EmailSequencesPage } from "./pages/EmailSequencesPage";
 import { EmailSendersPage } from "./pages/EmailSendersPage";
 import { EmailSuppressionPage } from "./pages/EmailSuppressionPage";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { AuthProvider, useAuth, type SaaSPermission } from "./contexts/AuthContext";
 import { AuthPage } from "./pages/AuthPage";
 import { ClientPitchPage } from "./pages/ClientPitchPage";
 import { ClientPortalPage } from "./pages/ClientPortalPage";
+import { UserManagementPage } from "./pages/UserManagementPage";
+import { PlatformAdminPage } from "./pages/PlatformAdminPage";
+
+
+function PermissionRoute({ permission, children }: { permission: SaaSPermission; children: JSX.Element }) {
+  const { can } = useAuth();
+  return can(permission) ? children : <Navigate to="/dashboard" replace />;
+}
 
 function ProtectedLayout() {
   const { token, loading } = useAuth();
@@ -91,7 +99,7 @@ export default function App() {
         <Route path="outreach/campaigns/:campaignId" element={<Navigate to="/email/campaigns" replace />} />
         <Route path="outreach/manager" element={<Navigate to="/email/campaigns" replace />} />
         <Route path="outreach/*" element={<Navigate to="/email/campaigns" replace />} />
-        <Route path="automation" element={<AutomationPage />} />
+        <Route path="automation" element={<PermissionRoute permission="automation.manage"><AutomationPage /></PermissionRoute>} />
         {/* ── Email Marketing ── */}
         <Route path="email/dashboard" element={<EmailDashboardPage />} />
         <Route path="email/campaigns" element={<EmailCampaignsPage />} />
@@ -124,8 +132,10 @@ export default function App() {
         <Route path="crm/*" element={<Navigate to="/leads" replace />} />
         <Route path="clients/all" element={<Navigate to="/leads" replace />} />
         <Route path="clients/*" element={<Navigate to="/leads" replace />} />
-        <Route path="settings/profile" element={<SettingsPage />} />
-        <Route path="settings/api" element={<ApiSetupPage />} />
+        <Route path="settings/users" element={<PermissionRoute permission="users.manage"><UserManagementPage /></PermissionRoute>} />
+        <Route path="platform" element={<PermissionRoute permission="platform.manage"><PlatformAdminPage /></PermissionRoute>} />
+        <Route path="settings/profile" element={<PermissionRoute permission="settings.manage"><SettingsPage /></PermissionRoute>} />
+        <Route path="settings/api" element={<PermissionRoute permission="integrations.manage"><ApiSetupPage /></PermissionRoute>} />
         <Route path="settings/*" element={<Navigate to="/settings/profile" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Route>

@@ -1,30 +1,16 @@
 import { Request, Response, NextFunction } from "express";
 import { getMainDb } from "../db/mainDb.js";
 import { getDb } from "../db/database.js";
+import { PLAN_CATALOG } from "../modules/saas/access.js";
 
-interface PlanLimits {
-  leads: number;
-  activeCampaigns: number;
-  scraperJobs: number;
-}
-
-const PLAN_LIMITS: Record<string, PlanLimits> = {
-  free: {
-    leads: 50,
-    activeCampaigns: 1,
-    scraperJobs: 5,
-  },
-  pro: {
-    leads: 1000,
-    activeCampaigns: 10,
-    scraperJobs: 50,
-  },
-  enterprise: {
-    leads: Infinity,
-    activeCampaigns: Infinity,
-    scraperJobs: Infinity,
-  },
-};
+interface PlanLimits { leads: number; activeCampaigns: number; scraperJobs: number; }
+export const PLAN_LIMITS: Record<string, PlanLimits> = Object.fromEntries(
+  Object.values(PLAN_CATALOG).map((plan) => [plan.key, {
+    leads: plan.limits.leads === -1 ? Infinity : plan.limits.leads,
+    activeCampaigns: plan.limits.activeCampaigns === -1 ? Infinity : plan.limits.activeCampaigns,
+    scraperJobs: plan.limits.scraperJobs === -1 ? Infinity : plan.limits.scraperJobs,
+  }])
+);
 
 function getTenantPlan(tenantId: string): string {
   try {
@@ -128,4 +114,3 @@ export function checkScraperLimit(req: Request, res: Response, next: NextFunctio
     next();
   }
 }
-export { PLAN_LIMITS };

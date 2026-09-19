@@ -2873,3 +2873,24 @@ export async function deleteEmailSequence(id: string): Promise<{ ok: boolean }> 
   });
   return parseResponse<{ ok: boolean }>(response);
 }
+
+// SaaS user and platform administration
+export type SaaSRole = "super_admin" | "admin" | "manager" | "member" | "viewer";
+export type SaaSPlanKey = "free" | "pro" | "enterprise";
+export type SaaSUser = { id: string; name: string; email: string; role: SaaSRole; platform_role?: string; is_active: number; last_login_at?: string | null; created_at: string; tenant_id?: string; tenant_name?: string; subscription_plan?: SaaSPlanKey };
+export type SaaSPlan = { key: SaaSPlanKey; name: string; description: string; limits: { users: number; leads: number; activeCampaigns: number; scraperJobs: number }; features: { multiUser: boolean; automation: boolean; advancedAudits: boolean; apiIntegrations: boolean; priorityWorkflows: boolean } };
+export type SaaSTenant = { id: string; name: string; subscription_plan: SaaSPlanKey; billing_status: string; created_at: string; updated_at: string; user_count: number; active_user_count: number };
+
+export async function fetchWorkspaceUsers(): Promise<{ items: SaaSUser[] }> { return parseResponse(await apiFetch(`${API_BASE_URL}/api/users`)); }
+export async function fetchWorkspacePlan(): Promise<{ tenant: SaaSTenant; plan: SaaSPlan; seatUsage: number; catalog: SaaSPlan[] }> { return parseResponse(await apiFetch(`${API_BASE_URL}/api/users/plan`)); }
+export async function createWorkspaceUser(data: { name: string; email: string; role: Exclude<SaaSRole, "super_admin">; password?: string }): Promise<{ user: SaaSUser; temporaryPassword: string }> { return parseResponse(await apiFetch(`${API_BASE_URL}/api/users`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) })); }
+export async function updateWorkspaceUser(id: string, data: { name?: string; role?: Exclude<SaaSRole, "super_admin">; isActive?: boolean }): Promise<void> { await parseResponse(await apiFetch(`${API_BASE_URL}/api/users/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) })); }
+export async function resetWorkspaceUserPassword(id: string): Promise<{ temporaryPassword: string }> { return parseResponse(await apiFetch(`${API_BASE_URL}/api/users/${id}/reset-password`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })); }
+export async function deleteWorkspaceUser(id: string): Promise<void> { await parseResponse(await apiFetch(`${API_BASE_URL}/api/users/${id}`, { method: "DELETE" })); }
+
+export async function fetchPlatformSummary(): Promise<{ tenants: number; activeTenants: number; users: number; activeUsers: number; plans: Array<{ plan: string; count: number }> }> { return parseResponse(await apiFetch(`${API_BASE_URL}/api/platform/summary`)); }
+export async function fetchPlatformTenants(): Promise<{ items: SaaSTenant[]; plans: SaaSPlan[] }> { return parseResponse(await apiFetch(`${API_BASE_URL}/api/platform/tenants`)); }
+export async function fetchPlatformUsers(search = ""): Promise<{ items: SaaSUser[] }> { return parseResponse(await apiFetch(`${API_BASE_URL}/api/platform/users?search=${encodeURIComponent(search)}`)); }
+export async function createPlatformTenant(data: { name: string; ownerName: string; ownerEmail: string; plan: SaaSPlanKey; password?: string }): Promise<{ tenant: { id: string; name: string; plan: SaaSPlanKey }; owner: SaaSUser; temporaryPassword: string }> { return parseResponse(await apiFetch(`${API_BASE_URL}/api/platform/tenants`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) })); }
+export async function updatePlatformTenant(id: string, data: { name?: string; plan?: SaaSPlanKey; status?: string }): Promise<void> { await parseResponse(await apiFetch(`${API_BASE_URL}/api/platform/tenants/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) })); }
+export async function updatePlatformUser(id: string, data: { role?: Exclude<SaaSRole, "super_admin">; isActive?: boolean }): Promise<void> { await parseResponse(await apiFetch(`${API_BASE_URL}/api/platform/users/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) })); }

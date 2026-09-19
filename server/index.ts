@@ -8,6 +8,8 @@ import "./db/migrate.js";
 import { getDb } from "./db/database.js";
 import { authRouter } from "./routes/auth.js";
 import { authMiddleware } from "./utils/authMiddleware.js";
+import { enforceSaasAccess } from "./modules/saas/access.js";
+import { usersRouter, platformRouter } from "./routes/users.js";
 import { leadsRouter } from "./routes/leads.js";
 import { scraperRouter, startScraperQueueRecovery } from "./routes/scrapers.js";
 import { outreachRouter } from "./routes/outreach.js";
@@ -95,7 +97,7 @@ app.use("/api/auth", (req, res, next) => {
   }
   next();
 }, authRouter);
-app.use("/api", apiRateLimiter, authMiddleware);
+app.use("/api", apiRateLimiter, authMiddleware, enforceSaasAccess);
 
 app.get("/api/dashboard/summary", (req, res) => {
   try {
@@ -464,6 +466,8 @@ app.get("/api/dashboard/summary", (req, res) => {
   }
 });
 
+app.use("/api/users", usersRouter);
+app.use("/api/platform", platformRouter);
 app.use("/api/leads", leadsRouter);
 app.use("/api/import", scraperRouter);
 app.use("/api/outreach", outreachRouter);

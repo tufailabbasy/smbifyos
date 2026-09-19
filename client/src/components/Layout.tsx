@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth, type PlanEntitlements, type SaaSPermission } from "../contexts/AuthContext";
 import { useThemeCleanup } from "./ThemeToggle";
 
 type IconName = "home" | "bolt" | "users" | "mail" | "send" | "sequence" | "shield" | "globe" | "pin" | "briefcase" | "workflow" | "team" | "check" | "server" | "ban" | "settings" | "menu" | "chevron" | "plus" | "logout";
@@ -33,23 +33,24 @@ function NavIcon({ name, className = "h-[18px] w-[18px]" }: { name: IconName; cl
   return <svg {...common}>{paths[name]}</svg>;
 }
 
-interface NavItem { label: string; to: string; icon: IconName; }
+interface NavItem { label: string; to: string; icon: IconName; permission?: SaaSPermission; planFeature?: keyof PlanEntitlements["features"]; }
 interface NavGroup { section: string; items: NavItem[]; }
 
 const navGroups: NavGroup[] = [
   { section: "Workspace", items: [{ label: "Command Center", to: "/command-center", icon: "bolt" }, { label: "Overview", to: "/dashboard", icon: "home" }] },
   { section: "Lead Pipeline", items: [{ label: "Prospects", to: "/leads", icon: "users" }, { label: "Discovery", to: "/lead-engine", icon: "pin" }, { label: "Audits", to: "/audit-tools/hub", icon: "shield" }, { label: "Outreach", to: "/email/campaigns", icon: "send" }, { label: "Meetings", to: "/meetings", icon: "briefcase" }] },
-  { section: "Automation", items: [{ label: "Workflows", to: "/automation", icon: "workflow" }, { label: "Sequences", to: "/email/sequences", icon: "sequence" }] },
-  { section: "Administration", items: [{ label: "Sender Accounts", to: "/email/senders", icon: "server" }, { label: "Suppression", to: "/email/suppression", icon: "ban" }, { label: "API Setup", to: "/settings/api", icon: "bolt" }, { label: "Settings", to: "/settings/profile", icon: "settings" }] },
+  { section: "Automation", items: [{ label: "Workflows", to: "/automation", icon: "workflow", permission: "automation.manage", planFeature: "automation" }, { label: "Sequences", to: "/email/sequences", icon: "sequence", permission: "outreach.manage" }] },
+  { section: "Administration", items: [{ label: "Team & Access", to: "/settings/users", icon: "team", permission: "users.manage" }, { label: "Sender Accounts", to: "/email/senders", icon: "server", permission: "integrations.manage" }, { label: "Suppression", to: "/email/suppression", icon: "ban", permission: "outreach.manage" }, { label: "API Setup", to: "/settings/api", icon: "bolt", permission: "integrations.manage" }, { label: "Settings", to: "/settings/profile", icon: "settings", permission: "settings.manage" }] },
+  { section: "Platform", items: [{ label: "Platform Admin", to: "/platform", icon: "shield", permission: "platform.manage" }] },
 ];
 
 const pageNames: Array<[string, string]> = [
-  ["/command-center", "Command Center"], ["/dashboard", "Overview"], ["/meetings", "Meetings"], ["/lead-engine", "Lead Engine"], ["/leads", "Lead Directory"], ["/email/dashboard", "Email Overview"], ["/email/campaigns", "Campaigns"], ["/email/sequences", "Sequences"], ["/email/senders", "Sender Accounts"], ["/email/suppression", "Suppression"], ["/audit-tools/hub", "Audit Hub"], ["/audit-tools/website", "Website Audit"], ["/audit-tools/gmb", "Local & GBP Audit"], ["/seo/dashboard", "SEO Workspace"], ["/seo/clients", "Clients"], ["/seo/team", "Team"], ["/seo/checklist-templates", "Checklist Templates"], ["/automation", "Workflows"], ["/settings/api", "API Setup"], ["/settings", "Settings"],
+  ["/command-center", "Command Center"], ["/dashboard", "Overview"], ["/meetings", "Meetings"], ["/lead-engine", "Lead Engine"], ["/leads", "Lead Directory"], ["/email/dashboard", "Email Overview"], ["/email/campaigns", "Campaigns"], ["/email/sequences", "Sequences"], ["/email/senders", "Sender Accounts"], ["/email/suppression", "Suppression"], ["/audit-tools/hub", "Audit Hub"], ["/audit-tools/website", "Website Audit"], ["/audit-tools/gmb", "Local & GBP Audit"], ["/seo/dashboard", "SEO Workspace"], ["/seo/clients", "Clients"], ["/seo/team", "Team"], ["/seo/checklist-templates", "Checklist Templates"], ["/automation", "Workflows"], ["/platform", "Platform Admin"], ["/settings/users", "Team & Access"], ["/settings/api", "API Setup"], ["/settings", "Settings"],
 ];
 
 export function AppLayout() {
   useThemeCleanup();
-  const { user, tenant, logout } = useAuth();
+  const { user, tenant, entitlements, can, logout } = useAuth();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("smbify-sidebar") === "collapsed");
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -59,6 +60,7 @@ export function AppLayout() {
   const brandName = "SMBify OS";
 
   const pageName = useMemo(() => pageNames.find(([path]) => location.pathname.startsWith(path))?.[1] || "Workspace", [location.pathname]);
+  const visibleNavGroups = navGroups.map((group) => ({ ...group, items: group.items.filter((item) => (!item.permission || can(item.permission)) && (!item.planFeature || Boolean(entitlements?.features[item.planFeature]))) })).filter((group) => group.items.length > 0);
 
   function toggleSidebar() {
     setCollapsed((value) => { const next = !value; localStorage.setItem("smbify-sidebar", next ? "collapsed" : "expanded"); return next; });
@@ -82,7 +84,7 @@ export function AppLayout() {
         </div>
 
         <nav className="app-sidebar-scroll flex-1 overflow-y-auto px-3 py-4">
-          {navGroups.map((group) => <div key={group.section} className="mb-4">
+          {visibleNavGroups.map((group) => <div key={group.section} className="mb-4">
             {!collapsed && <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[.14em] text-slate-500">{group.section}</p>}
             <div className="space-y-1">{group.items.map((item) => navItem(item))}</div>
           </div>)}
@@ -118,7 +120,7 @@ export function AppLayout() {
         <button type="button" aria-label="Close navigation" className="absolute inset-0 bg-slate-950/55 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
         <aside className="app-sidebar relative flex h-full w-[286px] flex-col shadow-2xl">
           <div className="flex h-[72px] items-center justify-between border-b border-white/10 px-4"><div className="flex items-center gap-3"><div className="brand-mark">SO</div><div><p className="text-sm font-semibold text-white">{brandName}</p><p className="text-[10px] uppercase tracking-wider text-slate-400">Growth workspace</p></div></div><button type="button" onClick={() => setMobileOpen(false)} className="rounded-lg p-2 text-slate-400 hover:bg-white/10 hover:text-white" aria-label="Close"><span className="text-xl leading-none">×</span></button></div>
-          <nav className="app-sidebar-scroll flex-1 overflow-y-auto px-3 py-4">{navGroups.map((group) => <div key={group.section} className="mb-4"><p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[.14em] text-slate-500">{group.section}</p><div className="space-y-1">{group.items.map((item) => navItem(item, true))}</div></div>)}</nav>
+          <nav className="app-sidebar-scroll flex-1 overflow-y-auto px-3 py-4">{visibleNavGroups.map((group) => <div key={group.section} className="mb-4"><p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[.14em] text-slate-500">{group.section}</p><div className="space-y-1">{group.items.map((item) => navItem(item, true))}</div></div>)}</nav>
         </aside>
       </div>}
     </div>

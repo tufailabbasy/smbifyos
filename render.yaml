@@ -30,5 +30,9 @@ services:
         generateValue: true
       - key: BOOTSTRAP_ADMIN_EMAIL
         sync: false
+      - key: SUPER_ADMIN_EMAIL
+        value: muhammadtufailabbasy@gmail.com
+      - key: SUPER_ADMIN_PASSWORD
+        sync: false
       - key: BOOTSTRAP_ADMIN_PASSWORD
         sync: false

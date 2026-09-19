@@ -44,3 +44,5 @@ GMB Automation/*.xlsx
 
 
 .github/workflows/
+
+.super-admin-credentials.json

@@ -14,7 +14,7 @@
     "start": "node dist/server/index.js",
     "migrate": "tsx server/db/migrate.ts",
     "typecheck": "tsc -p tsconfig.server.json --noEmit && npm --prefix client run typecheck",
-    "test": "tsx --test server/modules/outreach/personalizationCounters.test.ts server/modules/audits/evidenceIntegrity.test.ts server/modules/email/dispatchQueue.test.ts server/modules/automation/commandParser.test.ts",
+    "test": "tsx --test server/modules/outreach/personalizationCounters.test.ts server/modules/audits/evidenceIntegrity.test.ts server/modules/email/dispatchQueue.test.ts server/modules/automation/commandParser.test.ts server/modules/saas/access.test.ts",
     "test:counters": "tsx --test server/modules/outreach/personalizationCounters.test.ts",
     "test:audit-integrity": "tsx --test server/modules/audits/evidenceIntegrity.test.ts server/modules/email/dispatchQueue.test.ts server/modules/automation/commandParser.test.ts"
   },

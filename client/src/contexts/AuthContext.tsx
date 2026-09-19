@@ -6,6 +6,7 @@ export interface UserProfile {
   name: string;
   email: string;
   role: string;
+  isActive?: boolean;
 }
 
 export interface TenantInfo {
@@ -15,16 +16,30 @@ export interface TenantInfo {
   billingStatus: string;
 }
 
+export type SaaSPermission = "dashboard.view" | "leads.view" | "leads.manage" | "audits.run" | "outreach.manage" | "automation.manage" | "integrations.manage" | "settings.manage" | "users.manage" | "platform.manage";
+
 export interface TenantUsage {
   leads: number;
   activeCampaigns: number;
   scraperJobs: number;
 }
 
+export interface PlanEntitlements {
+  key: "free" | "pro" | "enterprise";
+  name: string;
+  description: string;
+  limits: { users: number; leads: number; activeCampaigns: number; scraperJobs: number };
+  features: { multiUser: boolean; automation: boolean; advancedAudits: boolean; apiIntegrations: boolean; priorityWorkflows: boolean };
+}
+
 interface AuthContextType {
   user: UserProfile | null;
   tenant: TenantInfo | null;
   usage: TenantUsage | null;
+  permissions: SaaSPermission[];
+  entitlements: PlanEntitlements | null;
+  isSuperAdmin: boolean;
+  can: (permission: SaaSPermission) => boolean;
   token: string | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -40,6 +55,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<UserProfile | null>(null);
   const [tenant, setTenant] = useState<TenantInfo | null>(null);
   const [usage, setUsage] = useState<TenantUsage | null>(null);
+  const [permissions, setPermissions] = useState<SaaSPermission[]>([]);
+  const [entitlements, setEntitlements] = useState<PlanEntitlements | null>(null);
   const [token, setToken] = useState<string | null>(localStorage.getItem("smbify_lead_auth_token"));
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -55,6 +72,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(data.user);
         setTenant(data.tenant);
         setUsage(data.usage);
+        setPermissions(data.permissions || []);
+        setEntitlements(data.entitlements || null);
       } else if (res.status === 401 || res.status === 404) {
         // Token invalid, expired, or user account no longer exists in database
         logout();
@@ -121,6 +140,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setTenant(null);
     setUsage(null);
+    setPermissions([]);
+    setEntitlements(null);
   };
 
   const refreshProfile = async () => {
@@ -148,12 +169,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await refreshProfile();
   };
 
+  const isSuperAdmin = user?.role === "super_admin";
+  const can = (permission: SaaSPermission) => isSuperAdmin || permissions.includes(permission);
+
   return (
     <AuthContext.Provider
       value={{
         user,
         tenant,
         usage,
+        permissions,
+        entitlements,
+        isSuperAdmin,
+        can,
         token,
         loading,
         login,

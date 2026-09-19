@@ -4,37 +4,10 @@ import { getMainDb } from "../db/mainDb.js";
 import { getDb, tenantLocalStorage } from "../db/database.js";
 import { generateToken } from "../utils/token.js";
 import { authMiddleware } from "../utils/authMiddleware.js";
+import { hashPassword, verifyPassword, validatePassword } from "../utils/password.js";
+import { PLAN_CATALOG, normalizePlan, normalizeRole, permissionsFor } from "../modules/saas/access.js";
 
 export const authRouter = Router();
-
-function hashPassword(password: string): string {
-  const salt = crypto.randomBytes(16).toString("hex");
-  const iterations = 100000;
-  const hash = crypto.pbkdf2Sync(password, salt, iterations, 64, "sha512").toString("hex");
-  return `v2:${iterations}:${salt}:${hash}`;
-}
-
-function verifyPassword(password: string, storedHashRecord: string): boolean {
-  try {
-    if (storedHashRecord.startsWith("v2:")) {
-      const parts = storedHashRecord.split(":");
-      if (parts.length !== 4) return false;
-      const iterations = parseInt(parts[1], 10) || 100000;
-      const salt = parts[2];
-      const storedHash = parts[3];
-      const computedHash = crypto.pbkdf2Sync(password, salt, iterations, 64, "sha512").toString("hex");
-      return crypto.timingSafeEqual(Buffer.from(computedHash, "hex"), Buffer.from(storedHash, "hex"));
-    }
-
-    // Legacy format: salt:hash (1000 iterations)
-    const [salt, storedHash] = storedHashRecord.split(":");
-    if (!salt || !storedHash) return false;
-    const computedHash = crypto.pbkdf2Sync(password, salt, 1000, 64, "sha512").toString("hex");
-    return crypto.timingSafeEqual(Buffer.from(computedHash, "hex"), Buffer.from(storedHash, "hex"));
-  } catch {
-    return false;
-  }
-}
 
 // POST /api/auth/signup
 authRouter.post("/signup", async (req, res) => {
@@ -46,15 +19,8 @@ authRouter.post("/signup", async (req, res) => {
        return;
     }
 
-    if (typeof password !== "string" || password.length < 8) {
-      res.status(400).json({ error: "Password must be at least 8 characters long" });
-      return;
-    }
-
-    if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
-      res.status(400).json({ error: "Password must contain both letters and numbers" });
-      return;
-    }
+    const passwordError = validatePassword(password);
+    if (passwordError) { res.status(400).json({ error: passwordError }); return; }
 
     const normalizedEmail = String(email).trim().toLowerCase();
     const mainDb = getMainDb();
@@ -141,7 +107,7 @@ authRouter.post("/login", (req, res) => {
 
     // Get user and their tenant details
     const user = mainDb.prepare(`
-      SELECT u.*, t.name as tenant_name, t.subscription_plan as tenant_plan
+      SELECT u.*, t.name as tenant_name, t.subscription_plan as tenant_plan, t.billing_status as tenant_status
       FROM users u
       JOIN tenants t ON u.tenant_id = t.id
       WHERE u.email = ?
@@ -154,6 +120,9 @@ authRouter.post("/login", (req, res) => {
       role: string;
       tenant_name: string;
       tenant_plan: string;
+      tenant_status: string;
+      platform_role: string;
+      is_active: number;
     } | undefined;
 
     if (!user) {
@@ -165,13 +134,20 @@ authRouter.post("/login", (req, res) => {
        res.status(401).json({ error: "Invalid email or password" });
        return;
     }
+    if (!Number(user.is_active)) { res.status(403).json({ error: "This account has been deactivated." }); return; }
+    const effectiveRole = normalizeRole(user.role, user.platform_role);
+    if (effectiveRole !== "super_admin" && ["suspended", "canceled"].includes(String(user.tenant_status || "").toLowerCase())) {
+      res.status(403).json({ error: "This workspace is suspended." }); return;
+    }
+
+    getMainDb().prepare("UPDATE users SET last_login_at = datetime('now') WHERE id = ?").run(user.id);
 
     // Generate token
     const token = generateToken({
       userId: user.id,
       tenantId: user.tenant_id,
       email: user.email,
-      role: user.role,
+      role: effectiveRole,
       name: user.name,
     });
 
@@ -181,7 +157,7 @@ authRouter.post("/login", (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role,
+        role: effectiveRole,
       },
       tenant: {
         id: user.tenant_id,
@@ -207,7 +183,7 @@ authRouter.get("/me", authMiddleware, (req, res) => {
     
     // Fetch fresh user/tenant state
     const user = mainDb.prepare(`
-      SELECT u.id, u.name, u.email, u.role, u.tenant_id,
+      SELECT u.id, u.name, u.email, u.role, u.platform_role, u.is_active, u.tenant_id,
              t.name as tenant_name, t.subscription_plan as tenant_plan, t.billing_status
       FROM users u
       JOIN tenants t ON u.tenant_id = t.id
@@ -217,6 +193,8 @@ authRouter.get("/me", authMiddleware, (req, res) => {
       name: string;
       email: string;
       role: string;
+      platform_role: string;
+      is_active: number;
       tenant_id: string;
       tenant_name: string;
       tenant_plan: string;
@@ -251,24 +229,14 @@ authRouter.get("/me", authMiddleware, (req, res) => {
       console.warn("Could not query tenant db usage metrics, using 0", dbErr);
     }
 
+    const effectiveRole = normalizeRole(user.role, user.platform_role);
+    const plan = PLAN_CATALOG[normalizePlan(user.tenant_plan)];
     res.json({
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-      tenant: {
-        id: user.tenant_id,
-        name: user.tenant_name,
-        plan: user.tenant_plan,
-        billingStatus: user.billing_status,
-      },
-      usage: {
-        leads: leadsCount,
-        activeCampaigns: activeCampaignsCount,
-        scraperJobs: scraperJobsCount,
-      }
+      user: { id: user.id, name: user.name, email: user.email, role: effectiveRole, isActive: Boolean(user.is_active) },
+      tenant: { id: user.tenant_id, name: user.tenant_name, plan: plan.key, billingStatus: user.billing_status },
+      permissions: permissionsFor(effectiveRole),
+      entitlements: plan,
+      usage: { leads: leadsCount, activeCampaigns: activeCampaignsCount, scraperJobs: scraperJobsCount },
     });
   } catch (error) {
     console.error("Auth profile fetch error:", error);

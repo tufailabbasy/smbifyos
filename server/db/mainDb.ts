@@ -58,6 +58,31 @@ function initMainDbSchema(db: DatabaseSync): void {
     );
   `);
 
+
+  const existingUserColumns = new Set((db.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>).map((column) => column.name));
+  const userColumnMigrations: Array<[string, string]> = [
+    ["platform_role", "TEXT NOT NULL DEFAULT 'user'"],
+    ["is_active", "INTEGER NOT NULL DEFAULT 1"],
+    ["last_login_at", "TEXT"],
+    ["created_by", "TEXT"],
+  ];
+  for (const [name, definition] of userColumnMigrations) {
+    if (!existingUserColumns.has(name)) db.exec(`ALTER TABLE users ADD COLUMN ${name} ${definition}`);
+  }
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);
+    CREATE INDEX IF NOT EXISTS idx_users_active ON users(is_active);
+    CREATE TABLE IF NOT EXISTS admin_audit_log (
+      id TEXT PRIMARY KEY,
+      actor_user_id TEXT NOT NULL,
+      action TEXT NOT NULL,
+      target_type TEXT NOT NULL,
+      target_id TEXT NOT NULL,
+      details_json TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_admin_audit_created ON admin_audit_log(created_at DESC);
+  `);
   // Index on email for fast lookups
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -107,6 +132,28 @@ function initMainDbSchema(db: DatabaseSync): void {
         fs.writeFileSync(file,JSON.stringify(bootstrap,null,2),{mode:0o600});
         console.warn("[auth] Replaced insecure bootstrap credentials. Read the local db/.bootstrap-admin-credentials.json file to sign in.");
       }
+    }
+    const superAdminEmail = String(process.env.SUPER_ADMIN_EMAIL || "").trim().toLowerCase();
+    const superAdminPassword = String(process.env.SUPER_ADMIN_PASSWORD || configuredPassword || "");
+    if (superAdminEmail) {
+      const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(superAdminEmail) as { id: string } | undefined;
+      if (existing) {
+        db.prepare("UPDATE users SET role = 'super_admin', platform_role = 'super_admin', is_active = 1, tenant_id = 'default', updated_at = datetime('now') WHERE id = ?").run(existing.id);
+        if (superAdminPassword.length >= 12) {
+          const salt = crypto.randomBytes(16).toString("hex");
+          const hash = "v2:100000:" + salt + ":" + crypto.pbkdf2Sync(superAdminPassword, salt, 100000, 64, "sha512").toString("hex");
+          db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(hash, existing.id);
+        }
+      } else if (superAdminPassword.length >= 12) {
+        const salt = crypto.randomBytes(16).toString("hex");
+        const hash = "v2:100000:" + salt + ":" + crypto.pbkdf2Sync(superAdminPassword, salt, 100000, 64, "sha512").toString("hex");
+        db.prepare(`INSERT INTO users (id, name, email, password_hash, tenant_id, role, platform_role, is_active)
+          VALUES (?, 'Muhammad Tufail', ?, ?, 'default', 'super_admin', 'super_admin', 1)`)
+          .run(crypto.randomUUID(), superAdminEmail, hash);
+      } else {
+        console.warn("[auth] SUPER_ADMIN_EMAIL is set but no secure SUPER_ADMIN_PASSWORD is available.");
+      }
+      console.log(`[auth] Platform super admin ready: ${superAdminEmail}`);
     }
   } catch (error) {
     console.error("[mainDb] Failed to seed default data:", error);
