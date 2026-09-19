@@ -17,7 +17,11 @@ services:
       - key: HOST
         value: 0.0.0.0
       - key: CORS_ORIGIN
-        value: https://smbify-os.onrender.com,https://lead.smbify.net
+        value: https://smbify-os.onrender.com,https://smbifyos.app,https://www.smbifyos.app
+      - key: APP_BASE_URL
+        value: https://smbifyos.app
+      - key: APP_URL
+        value: https://smbifyos.app
       - key: OUTBOUND_EMAIL_ENABLED
         value: "false"
       - key: JWT_SECRET
