@@ -24,6 +24,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
 export type PlanKey = "free" | "pro" | "enterprise";
 export type PlanDefinition = {
   key: PlanKey; name: string; description: string;
+  pricing: { currency: "USD"; monthly: number; yearly: number };
   limits: { users: number; leads: number; activeCampaigns: number; scraperJobs: number };
   features: { multiUser: boolean; automation: boolean; advancedAudits: boolean; apiIntegrations: boolean; priorityWorkflows: boolean };
 };
@@ -31,16 +32,19 @@ export type PlanDefinition = {
 export const PLAN_CATALOG: Record<PlanKey, PlanDefinition> = {
   free: {
     key: "free", name: "Starter", description: "Single-user workspace for validating the lead workflow.",
+    pricing: { currency: "USD", monthly: 0, yearly: 0 },
     limits: { users: 1, leads: 50, activeCampaigns: 1, scraperJobs: 5 },
     features: { multiUser: false, automation: false, advancedAudits: true, apiIntegrations: true, priorityWorkflows: false },
   },
   pro: {
     key: "pro", name: "Growth", description: "Team workspace with automation and higher operating limits.",
+    pricing: { currency: "USD", monthly: 49, yearly: 490 },
     limits: { users: 5, leads: 1000, activeCampaigns: 10, scraperJobs: 50 },
     features: { multiUser: true, automation: true, advancedAudits: true, apiIntegrations: true, priorityWorkflows: true },
   },
   enterprise: {
     key: "enterprise", name: "Agency", description: "Full agency controls, unlimited seats and workflows.",
+    pricing: { currency: "USD", monthly: 149, yearly: 1490 },
     limits: { users: -1, leads: -1, activeCampaigns: -1, scraperJobs: -1 },
     features: { multiUser: true, automation: true, advancedAudits: true, apiIntegrations: true, priorityWorkflows: true },
   },

@@ -31,7 +31,7 @@ usersRouter.get("/plan", (req, res) => {
 });
 
 usersRouter.get("/", (req, res) => {
-  const rows = getMainDb().prepare(`SELECT id, name, email, role, platform_role, is_active, last_login_at, created_at, updated_at
+  const rows = getMainDb().prepare(`SELECT id, name, email, CASE WHEN platform_role = 'super_admin' THEN 'super_admin' ELSE role END role, role workspace_role, platform_role, is_active, last_login_at, created_at, updated_at
     FROM users WHERE tenant_id = ? AND (? = 'super_admin' OR platform_role != 'super_admin') ORDER BY is_active DESC, created_at ASC`).all(req.user!.tenantId, req.user!.role);
   res.json({ items: rows });
 });
@@ -62,13 +62,16 @@ usersRouter.post("/", (req, res) => {
 
 usersRouter.patch("/:id", (req, res) => {
   const db = getMainDb();
-  const target = db.prepare("SELECT id, role, platform_role, is_active FROM users WHERE id = ? AND tenant_id = ?").get(req.params.id, req.user!.tenantId) as any;
+  const target = db.prepare("SELECT id, email, role, platform_role, is_active FROM users WHERE id = ? AND tenant_id = ?").get(req.params.id, req.user!.tenantId) as any;
   if (!target) { res.status(404).json({ error: "User not found." }); return; }
   if (target.platform_role === "super_admin" && req.user!.role !== "super_admin") { res.status(403).json({ error: "Platform super-admin accounts are protected." }); return; }
   if (target.id === req.user!.userId && (req.body?.isActive === false || req.body?.role && req.body.role !== target.role)) {
     res.status(400).json({ error: "You cannot deactivate or change your own role." }); return;
   }
   const name = clean(req.body?.name);
+  const email = req.body?.email === undefined ? "" : emailValue(req.body.email);
+  if (email && !validEmail(email)) { res.status(400).json({ error: "Enter a valid email address." }); return; }
+  if (email && db.prepare("SELECT id FROM users WHERE email = ? AND id != ?").get(email, target.id)) { res.status(409).json({ error: "This email is already registered." }); return; }
   const requestedRole = clean(req.body?.role).toLowerCase();
   const role = requestedRole && USER_ROLES.includes(requestedRole as any) ? requestedRole : target.role;
   const isActive = typeof req.body?.isActive === "boolean" ? (req.body.isActive ? 1 : 0) : Number(target.is_active);
@@ -76,12 +79,11 @@ usersRouter.patch("/:id", (req, res) => {
     const admins = db.prepare("SELECT COUNT(*) count FROM users WHERE tenant_id = ? AND role = 'admin' AND is_active = 1").get(req.user!.tenantId) as { count: number };
     if (admins.count <= 1) { res.status(400).json({ error: "Every workspace must keep at least one active admin." }); return; }
   }
-  db.prepare("UPDATE users SET name = COALESCE(NULLIF(?, ''), name), role = ?, is_active = ?, updated_at = datetime('now') WHERE id = ?")
-    .run(name, role, isActive, target.id);
-  audit(req.user!.userId, "user.updated", "user", target.id, { role, isActive });
+  db.prepare("UPDATE users SET name = COALESCE(NULLIF(?, ''), name), email = COALESCE(NULLIF(?, ''), email), role = ?, is_active = ?, updated_at = datetime('now') WHERE id = ?")
+    .run(name, email, role, isActive, target.id);
+  audit(req.user!.userId, "user.updated", "user", target.id, { name: name || undefined, email: email || undefined, role, isActive });
   res.json({ ok: true });
 });
-
 usersRouter.post("/:id/reset-password", (req, res) => {
   const db = getMainDb();
   const target = db.prepare("SELECT id, platform_role FROM users WHERE id = ? AND tenant_id = ?").get(req.params.id, req.user!.tenantId) as any;
@@ -127,7 +129,7 @@ platformRouter.get("/tenants", (_req, res) => {
 
 platformRouter.get("/users", (req, res) => {
   const search = `%${clean(req.query.search)}%`;
-  const rows = getMainDb().prepare(`SELECT u.id, u.name, u.email, u.role, u.platform_role, u.is_active, u.last_login_at, u.created_at,
+  const rows = getMainDb().prepare(`SELECT u.id, u.name, u.email, CASE WHEN u.platform_role = 'super_admin' THEN 'super_admin' ELSE u.role END role, u.role workspace_role, u.platform_role, u.is_active, u.last_login_at, u.created_at,
     t.id tenant_id, t.name tenant_name, t.subscription_plan FROM users u JOIN tenants t ON t.id = u.tenant_id
     WHERE (? = '%%' OR u.name LIKE ? OR u.email LIKE ? OR t.name LIKE ?) ORDER BY u.created_at DESC LIMIT 500`).all(search, search, search, search);
   res.json({ items: rows });
@@ -170,18 +172,37 @@ platformRouter.patch("/tenants/:id", (req, res) => {
 
 platformRouter.patch("/users/:id", (req, res) => {
   const db = getMainDb();
-  const target = db.prepare("SELECT id, platform_role FROM users WHERE id = ?").get(req.params.id) as any;
+  const target = db.prepare("SELECT id, email, role, platform_role, is_active, tenant_id FROM users WHERE id = ?").get(req.params.id) as any;
   if (!target) { res.status(404).json({ error: "User not found." }); return; }
   if (target.id === req.user!.userId && req.body?.isActive === false) { res.status(400).json({ error: "You cannot deactivate your own super-admin account." }); return; }
+  const name = clean(req.body?.name);
+  const email = req.body?.email === undefined ? "" : emailValue(req.body.email);
+  if (email && !validEmail(email)) { res.status(400).json({ error: "Enter a valid email address." }); return; }
+  if (email && db.prepare("SELECT id FROM users WHERE email = ? AND id != ?").get(email, target.id)) { res.status(409).json({ error: "This email is already registered." }); return; }
   const roleInput = clean(req.body?.role).toLowerCase();
-  const role = USER_ROLES.includes(roleInput as any) ? roleInput : null;
+  const role = target.platform_role === "super_admin" ? null : (USER_ROLES.includes(roleInput as any) ? roleInput : null);
   const isActive = typeof req.body?.isActive === "boolean" ? (req.body.isActive ? 1 : 0) : null;
-  db.prepare("UPDATE users SET role = COALESCE(?, role), is_active = COALESCE(?, is_active), updated_at = datetime('now') WHERE id = ?")
-    .run(role, isActive, target.id);
-  audit(req.user!.userId, "platform.user_updated", "user", target.id, { role, isActive });
+  if (target.role === "admin" && target.platform_role !== "super_admin" && ((isActive === 0) || (role && role !== "admin"))) {
+    const admins = db.prepare("SELECT COUNT(*) count FROM users WHERE tenant_id = ? AND role = 'admin' AND is_active = 1").get(target.tenant_id) as { count: number };
+    if (admins.count <= 1) { res.status(400).json({ error: "Assign another workspace admin before removing this admin's access." }); return; }
+  }
+  db.prepare("UPDATE users SET name = COALESCE(NULLIF(?, ''), name), email = COALESCE(NULLIF(?, ''), email), role = COALESCE(?, role), is_active = COALESCE(?, is_active), updated_at = datetime('now') WHERE id = ?")
+    .run(name, email, role, isActive, target.id);
+  audit(req.user!.userId, "platform.user_updated", "user", target.id, { name: name || undefined, email: email || undefined, role, isActive });
   res.json({ ok: true });
 });
 
+platformRouter.post("/users/:id/reset-password", (req, res) => {
+  const db = getMainDb();
+  const target = db.prepare("SELECT id FROM users WHERE id = ?").get(req.params.id) as any;
+  if (!target) { res.status(404).json({ error: "User not found." }); return; }
+  const password = clean(req.body?.password) || generateTemporaryPassword();
+  const error = validatePassword(password);
+  if (error) { res.status(400).json({ error }); return; }
+  db.prepare("UPDATE users SET password_hash = ?, updated_at = datetime('now') WHERE id = ?").run(hashPassword(password), target.id);
+  audit(req.user!.userId, "platform.user_password_reset", "user", target.id);
+  res.json({ ok: true, temporaryPassword: password });
+});
 platformRouter.get("/audit-log", (_req, res) => {
   const rows = getMainDb().prepare(`SELECT a.*, u.name actor_name, u.email actor_email FROM admin_audit_log a
     LEFT JOIN users u ON u.id = a.actor_user_id ORDER BY a.created_at DESC LIMIT 200`).all();

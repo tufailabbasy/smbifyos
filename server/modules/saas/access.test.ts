@@ -21,6 +21,9 @@ test("plans have increasing seats and protected automation", () => {
   assert.equal(PLAN_CATALOG.free.limits.users, 1);
   assert.equal(PLAN_CATALOG.free.features.automation, false);
   assert.equal(PLAN_CATALOG.pro.features.automation, true);
+  assert.equal(PLAN_CATALOG.free.pricing.monthly, 0);
+  assert.equal(PLAN_CATALOG.pro.pricing.monthly, 49);
+  assert.equal(PLAN_CATALOG.enterprise.pricing.monthly, 149);
   assert.equal(PLAN_CATALOG.enterprise.limits.users, -1);
 });
 
